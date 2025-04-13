@@ -1,0 +1,6 @@
+flask
+torch
+beautifulsoup4
+requests
+requests_html
+lxml_html_clean

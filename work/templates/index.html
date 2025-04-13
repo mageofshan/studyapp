@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Enhanced Study App</title>
+    <script>
+        async function startLearnMode() {
+            const url = document.getElementById('flashcard-url').value;
+            const response = await fetch('/start_learn_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            const data = await response.json();
+            alert(data.message || data.error);
+        }
+
+        async function getNextFlashcard() {
+            const response = await fetch('/next_flashcard');
+            const data = await response.json();
+            if (data.error) {
+                alert(data.error);
+            } else {
+                document.getElementById('flashcard-question').innerText = data.question;
+            }
+        }
+
+        async function recordPerformance(correct) {
+            const question = document.getElementById('flashcard-question').innerText;
+            const response = await fetch('/record_performance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question, correct })
+            });
+            const data = await response.json();
+            alert(data.message || data.error);
+        }
+
+        async function getPerformanceSummary() {
+            const response = await fetch('/performance_summary');
+            const data = await response.json();
+            if (data.error) {
+                alert(data.error);
+            } else {
+                const summary = JSON.stringify(data, null, 2);
+                document.getElementById('performance-summary').innerText = summary;
+            }
+        }
+
+        async function updateLearnModeSettings() {
+            const length = document.getElementById('session-length').value;
+            const answerWith = document.getElementById('answer-with').value;
+            const allowTypos = document.getElementById('allow-typos').checked;
+
+            const response = await fetch('/set_learn_mode_options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ length, answer_with: answerWith, allow_typos: allowTypos })
+            });
+            const data = await response.json();
+            alert(data.message || data.error);
+        }
+
+        async function starTerm() {
+            const term = document.getElementById('star-term').value;
+            const response = await fetch('/star_term', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ term })
+            });
+            const data = await response.json();
+            alert(data.message || data.error);
+        }
+
+        async function generateQuestion() {
+            const question = document.getElementById('question-term').value;
+            const level = document.getElementById('question-level').value;
+
+            const response = await fetch('/generate_question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question, level: parseInt(level) })
+            });
+            const data = await response.json();
+            if (data.error) {
+                alert(data.error);
+            } else {
+                document.getElementById('generated-question').innerText = data.question;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Welcome to the AI-Enhanced Study App</h1>
+
+    <div>
+        <h2>Start Learn Mode</h2>
+        <input type="text" id="flashcard-url" placeholder="Enter flashcard URL">
+        <button onclick="startLearnMode()">Start</button>
+    </div>
+
+    <div>
+        <h2>Learn Mode</h2>
+        <button onclick="getNextFlashcard()">Next Flashcard</button>
+        <p id="flashcard-question">Your question will appear here.</p>
+        <button onclick="recordPerformance(true)">Correct</button>
+        <button onclick="recordPerformance(false)">Incorrect</button>
+    </div>
+
+    <div>
+        <h2>Performance Summary</h2>
+        <button onclick="getPerformanceSummary()">Show Summary</button>
+        <pre id="performance-summary">Your performance summary will appear here.</pre>
+    </div>
+
+    <div>
+        <h2>Learn Mode Settings</h2>
+        <label for="session-length">Session Length:</label>
+        <input type="number" id="session-length" value="10">
+        <label for="answer-with">Answer With:</label>
+        <select id="answer-with">
+            <option value="definition">Definition</option>
+            <option value="term">Term</option>
+        </select>
+        <label for="allow-typos">Allow Typos:</label>
+        <input type="checkbox" id="allow-typos">
+        <button onclick="updateLearnModeSettings()">Update Settings</button>
+    </div>
+
+    <div>
+        <h2>Star Terms</h2>
+        <input type="text" id="star-term" placeholder="Enter term to star">
+        <button onclick="starTerm()">Star Term</button>
+    </div>
+
+    <div>
+        <h2>Generate Question</h2>
+        <input type="text" id="question-term" placeholder="Enter term">
+        <label for="question-level">Level:</label>
+        <select id="question-level">
+            <option value="1">True/False</option>
+            <option value="2">Multiple Choice</option>
+            <option value="3">Written Response</option>
+        </select>
+        <button onclick="generateQuestion()">Generate</button>
+        <p id="generated-question">Your question will appear here.</p>
+    </div>
+</body>
+</html>
