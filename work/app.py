@@ -12,15 +12,13 @@ app.secret_key = os.urandom(24)
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    tab = request.args.get('tab', 'start')  # default to 'start'
+    return render_template('index.html', active_tab=tab)
 
 @app.route('/start_learn_mode', methods=['POST'])
 def start_learn_mode():
-    # check if request is JSON
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    # url value
-    url = request.json.get('url')
+    # no JSON check (leads to not being read)
+    url = request.form.get('url')
     if not url:
         return jsonify({"error": "URL is required"}), 400
     try:
@@ -28,50 +26,74 @@ def start_learn_mode():
         flashcards = get_flashcards(url)
         
         # store flashcards in session
-        session['flashcards'] = {key: value for key, value in flashcards.items()}
-        session['performance'] = {i: {'correct': 0, 'incorrect': 0} for i in flashcards.keys()}
-        session['starred'] = []
-        session['length'] = 10
-        session['answer_with'] = 'definition'
-        session['allow_typos'] = False
+        session['flashcards'] = flashcards  # dictionary of flashcards from url
+        session['performance'] = {i: {'correct': 0, 'incorrect': 0} for i in session['flashcards'].keys()}  # nothing correct/incorrect yet
+        session['starred'] = []  # nothing starred yet
+        session['length'] = len(session['flashcards'])  # default length is the number of flashcards
+        session['answer_with'] = 'term'  # default answer with term
+        session['allow_typos'] = True  # default allow typos
         
-        return jsonify({
-            "message": "Learn Mode started successfully!", 
-            "flashcards_count": len(flashcards)
-        })
+        # force session update
+        session.modified = True
+        
+        # open learn tab after start clicked
+        return render_template('index.html', message="Learn Mode started successfully!", active_tab="settings")
+    
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return render_template('index.html', error=str(e), active_tab="start")
 
-@app.route('/next_flashcard', methods=['GET'])
-def next_flashcard():
-    # make sure learn mode started
+@app.route('/set_learn_mode_options', methods=['POST'])
+def set_learn_mode_options():
+    # check if learn mode started
     if 'flashcards' not in session:
         return jsonify({"error": "Learn Mode has not been started."}), 400
     
-    # create temporary LearnMode instance with session data
+    # transfer learn mode options from request to session
+    session['length'] = int(request.form.get('length', session.get('length', 10)))
+    session['answer_with'] = request.form.get('answer_with', session.get('answer_with', 'definition'))
+    session['allow_typos'] = 'allow_typos' in request.form
+    # split starred as comma-separated list and input
+    starred_raw = request.form.get('starred', '')
+    session['starred'] = [term.strip() for term in starred_raw.split(',') if term.strip()]
+    
+    # force session update
+    session.modified = True
+    
+    flashcard = None
+    flashcard_data = get_flashcard()
+    if flashcard_data:  # ensure flashcard data is not None
+        flashcard = flashcard_data['question']  # pass only the question to the template
+
+    # confirm settings update to user
+    return render_template('index.html', message="Learn Mode settings updated successfully!", active_tab="learn", flashcard=flashcard)
+
+
+@app.route('/next_flashcard', methods=['GET'])
+def get_flashcard():
+    # make sure learn mode started
+    if 'flashcards' not in session:
+        return None
+    
+    # create temporary LearnMode instance with session data for get_next_flashcard()
     learn_mode = LearnMode(
         session['flashcards'],
         length=session.get('length', 10),
-        answer_with=session.get('answer_with', 'definition'),
-        allow_typos=session.get('allow_typos', False)
+        answer_with=session.get('answer_with', 'term'),
+        allow_typos=session.get('allow_typos', True),
     )
     
-    # transfer session data to session
+    # transfer session data to LearnMode instance
     learn_mode.performance = session['performance']
     learn_mode.starred = set(session['starred'])
     
     # get next flashcard info
-    question = learn_mode.get_next_flashcard() #from learn_mode.py, puts learning weightage and starred in consideration
-    answer = session['flashcards'][question]
+    question = learn_mode.get_next_flashcard()  # get the next question
+    if not question:  # if no more flashcards, return None
+        return None
+    answer = session['flashcards'][question]  # get the answer for the question
     
     # return flashcard info
-    return jsonify({
-        "question": question,
-        "answer": answer,
-        #considering the following
-        #"learning_weightage": learn_mode.get_learning_weightage(question),
-        #"starred": question in learn_mode.starred
-    })
+    return {"question": question, "answer": answer}
 
 @app.route('/record_performance', methods=['POST'])
 def record_performance():
@@ -79,17 +101,12 @@ def record_performance():
     if 'flashcards' not in session:
         return jsonify({"error": "Learn Mode has not been started."}), 400
     
-    # check if request is JSON
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    
     # get question and correct answer from request
-    data = request.json
-    question = data.get('question')
-    correct = data.get('correct')
+    question = request.form.get('question')
+    correct = request.form.get('correct') == 'true'
     
     if question not in session['flashcards']:
-        return jsonify({"error": "Invalid question"}), 400
+        return redirect(url_for('home', tab='learn'))
     
     # update performance in session
     if correct:
@@ -100,8 +117,8 @@ def record_performance():
     # force session update
     session.modified = True
     
-    # confirm
-    return jsonify({"message": "Performance recorded successfully!"})
+    # next flashcard
+    return redirect(url_for('home', tab='learn'))
 
 @app.route('/performance_summary', methods=['GET'])
 def performance_summary():
@@ -124,27 +141,6 @@ def performance_summary():
     
     #return jsonified summary
     return jsonify(summary)
-
-@app.route('/set_learn_mode_options', methods=['POST'])
-def set_learn_mode_options():
-    # check if learn mode started
-    if 'flashcards' not in session:
-        return jsonify({"error": "Learn Mode has not been started."}), 400
-    # check if request is JSON
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    
-    # transfer learn mode options from request to session
-    data = request.json
-    session['length'] = int(data.get('length', session.get('length', 10)))
-    session['answer_with'] = data.get('answer_with', session.get('answer_with', 'definition'))
-    session['allow_typos'] = data.get('allow_typos', session.get('allow_typos', False))
-    
-    # force session update
-    session.modified = True
-    
-    # confirm settings update to user
-    return jsonify({"message": "Learn Mode options updated successfully!"})
 
 @app.route('/star_term', methods=['POST'])
 def star_term():
@@ -175,36 +171,6 @@ def star_term():
         # force session update
         session.modified = True
         return jsonify({"message": f"Term '{term}' unstarred successfully!"})
-
-@app.route('/generate_question', methods=['POST'])
-def generate_question():
-    # check if learn mode started
-    if 'flashcards' not in session:
-        return jsonify({"error": "Learn Mode has not been started."}), 400
-    
-    # check if request is JSON
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
-    
-    # get question and level from request
-    data = request.json
-    question = data.get('question')
-    level = int(data.get('level', 1))
-    
-    # check if question exists
-    if question not in session['flashcards']:
-        return jsonify({"error": f"Question '{question}' not found in flashcards."}), 400
-    
-    # create temporary LearnMode instance
-    learn_mode = LearnMode(session['flashcards'])
-    generated_question = learn_mode.generate_question(question, level)
-    
-    # return jsonified generated question
-    return jsonify({
-        "question": generated_question,
-        "original_question": question,
-        "level": level
-    })
 
 @app.route('/clear_learn_mode', methods=['POST'])
 def clear_learn_mode():
