@@ -3,8 +3,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from models.learn_mode import LearnMode
 from scrapers.flashcard_scraper import get_flashcards
 import json
-import os
-#os for secure session
+import os #os for secure session
 
 app = Flask(__name__)
 # secure session
@@ -26,17 +25,23 @@ def start_learn_mode():
         flashcards = get_flashcards(url)
         
         # store flashcards in session
-        session['flashcards'] = flashcards  # dictionary of flashcards from url
+        session['flashcards'] = {key: value for key, value in flashcards.items()}  # dictionary of flashcards from url
         session['performance'] = {i: {'correct': 0, 'incorrect': 0} for i in session['flashcards'].keys()}  # nothing correct/incorrect yet
         session['starred'] = []  # nothing starred yet
         session['length'] = len(session['flashcards'])  # default length is the number of flashcards
         session['answer_with'] = 'term'  # default answer with term
         session['allow_typos'] = True  # default allow typos
+        # both empty until get_flashcard is called
+        session['question'] = None
+        session['answer'] = None
+        session['question_type'] = None
+        session['options'] = None
+        session['current_question'] = 0
         
         # force session update
         session.modified = True
         
-        # open learn tab after start clicked
+        # open settings tab after start clicked
         return render_template('index.html', message="Learn Mode started successfully!", active_tab="settings")
     
     except Exception as e:
@@ -49,32 +54,26 @@ def set_learn_mode_options():
         return jsonify({"error": "Learn Mode has not been started."}), 400
     
     # transfer learn mode options from request to session
-    session['length'] = int(request.form.get('length', session.get('length', 10)))
+    session['length'] = int(request.form.get('length', session.get('length')))
     session['answer_with'] = request.form.get('answer_with', session.get('answer_with', 'definition'))
     session['allow_typos'] = 'allow_typos' in request.form
     # split starred as comma-separated list and input
     starred_raw = request.form.get('starred', '')
     session['starred'] = [term.strip() for term in starred_raw.split(',') if term.strip()]
-    
+
     # force session update
     session.modified = True
-    
-    flashcard = None
-    flashcard_data = get_flashcard()
-    if flashcard_data:  # ensure flashcard data is not None
-        flashcard = flashcard_data['question']  # pass only the question to the template
 
-    # confirm settings update to user
-    return render_template('index.html', message="Learn Mode settings updated successfully!", active_tab="learn", flashcard=flashcard)
+    # redirect to first flashcard instead of learn tab
+    return redirect(url_for('get_flashcard'))
 
-
-@app.route('/next_flashcard', methods=['GET'])
+@app.route('/get_flashcard', methods=['GET'])
 def get_flashcard():
     # make sure learn mode started
     if 'flashcards' not in session:
-        return None
+        return render_template('index.html', error="Learn Mode has not been started.", active_tab="learn")
     
-    # create temporary LearnMode instance with session data for get_next_flashcard()
+    # create temporary LearnMode instance with session data for get_next_question()
     learn_mode = LearnMode(
         session['flashcards'],
         length=session.get('length', 10),
@@ -86,39 +85,76 @@ def get_flashcard():
     learn_mode.performance = session['performance']
     learn_mode.starred = set(session['starred'])
     
-    # get next flashcard info
-    question = learn_mode.get_next_flashcard()  # get the next question
-    if not question:  # if no more flashcards, return None
-        return None
-    answer = session['flashcards'][question]  # get the answer for the question
+    # get next question info
+    question_data = learn_mode.get_next_question(level=2)  # default to multiple choice
+    if not question_data:  # if no more questions, redirect to performance
+        return redirect(url_for('home', tab='performance'))
     
-    # return flashcard info
-    return {"question": question, "answer": answer}
+    # store question data in session
+    session['question'] = question_data['question']
+    session['answer'] = question_data['answer']
+    session['question_type'] = question_data['type']
+    if 'options' in question_data:
+        session['options'] = question_data['options']
+    
+    # update current question number
+    session['current_question'] = session.get('current_question', 0) + 1
+    
+    # force session update
+    session.modified = True
+    
+    # render template with question data
+    return render_template('index.html', 
+                         active_tab="learn",
+                         question=question_data['question'],
+                         question_type=question_data['type'],
+                         options=question_data.get('options', []),
+                         current_question=session['current_question'],
+                         total_questions=session['length'])
 
 @app.route('/record_performance', methods=['POST'])
 def record_performance():
     # make sure learn mode started
     if 'flashcards' not in session:
-        return jsonify({"error": "Learn Mode has not been started."}), 400
+        return render_template('index.html', error="Learn Mode has not been started.", active_tab="learn")
     
-    # get question and correct answer from request
+    # get question and user's answer from request
     question = request.form.get('question')
-    correct = request.form.get('correct') == 'true'
+    user_answer = request.form.get('answer')
+
+    if not question or not user_answer:
+        return render_template('index.html', error="Missing question or answer.", active_tab="learn")
     
-    if question not in session['flashcards']:
-        return redirect(url_for('home', tab='learn'))
+    # create temporary LearnMode instance
+    learn_mode = LearnMode(
+        session['flashcards'],
+        length=session.get('length', 10),
+        answer_with=session.get('answer_with', 'term'),
+        allow_typos=session.get('allow_typos', True),
+    )
     
-    # update performance in session
-    if correct:
-        session['performance'][question]['correct'] += 1
-    else:
-        session['performance'][question]['incorrect'] += 1
+    # transfer session data to LearnMode instance
+    learn_mode.performance = session['performance']
+    learn_mode.starred = set(session['starred'])
+    
+    # check if answer is correct
+    is_correct = learn_mode.check_answer(question, user_answer)
+    
+    # record performance
+    learn_mode.record_performance(question, is_correct)
+    
+    # update session with new performance data
+    session['performance'] = learn_mode.performance
     
     # force session update
     session.modified = True
     
-    # next flashcard
-    return redirect(url_for('home', tab='learn'))
+    # if we've reached the end, redirect to performance
+    if session.get('current_question', 0) >= session['length']:
+        return redirect(url_for('home', tab='performance'))
+    
+    # otherwise, get next question
+    return redirect(url_for('get_flashcard'))
 
 @app.route('/performance_summary', methods=['GET'])
 def performance_summary():

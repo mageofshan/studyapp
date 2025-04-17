@@ -293,7 +293,7 @@ label {
     height: 100%;
     background-color: var(--success-color);
     border-radius: 10px;
-    width: 0%;
+    width: 10%;
     transition: width 0.3s;
 }
 

@@ -75,25 +75,39 @@
         <!-- Learn Mode Tab -->
         <div class="tab-content {% if active_tab == 'learn' %}active{% endif %}" id="learn-tab">
             <div class="card">
-                {% if flashcard %}
-                    <div class="status-bar">
-                        <div id="progress-text">1/{{ session.length }}</div>
-                        <div class="stars" id="star-button">★</div>
-                    </div>
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: 10%"></div>
-                    </div>
-                    <div class="flashcard" id="flashcard">
-                        <div class="question">Q: {{ flashcard }}</div>
-                        <form method="post" action="/record_performance">
-                            <input type="hidden" name="question" value="{{ flashcard }}">
-                            <button type="submit" name="correct" value="true">Correct</button>
-                            <button type="submit" name="incorrect" value="false">Incorrect</button>
-                        </form>
-                    </div>
-                {% else %}
-                    <p>No more flashcards in this session.</p>
-                {% endif %}
+                <div class="status-bar">
+                    <div id="progress-text">{{ current_question }}/{{ total_questions }}</div>
+                    <div class="stars" id="star-button">★</div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: 10%"></div>
+                </div>
+                <div class="flashcard" id="flashcard">
+                    <div class="question">{{ question }}</div>
+                    <form method="post" action="/record_performance">
+                        <input type="hidden" name="question" value="{{ question }}">
+                        {% if question_type == 'multiple_choice' %}
+                            {% for option in options %}
+                                <div class="option">
+                                    <input type="radio" name="answer" value="{{ option }}" id="option{{ loop.index }}" required>
+                                    <label for="option{{ loop.index }}">{{ option }}</label>
+                                </div>
+                            {% endfor %}
+                        {% elif question_type == 'true_false' %}
+                            <div class="option">
+                                <input type="radio" name="answer" value="True" id="true" required>
+                                <label for="true">True</label>
+                            </div>
+                            <div class="option">
+                                <input type="radio" name="answer" value="False" id="false" required>
+                                <label for="false">False</label>
+                            </div>
+                        {% elif question_type == 'written' %}
+                            <input type="text" name="answer" id="answer" placeholder="Enter your answer" required>
+                        {% endif %}
+                        <button type="submit">Submit Answer</button>
+                    </form>
+                </div>
             </div>
         </div>
 

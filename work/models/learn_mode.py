@@ -31,8 +31,8 @@ class LearnMode:
         # if doesn't exist, return False (avoid Error)
         return False
 
-    def get_next_flashcard(self):
-        """Select the next flashcard based on performance and starred terms."""
+    def get_next_question(self, level=1):
+        """Select and generate the next question based on performance, starred terms, and question level."""
         # if no flashcards available (LearnMode hasn't started), return None
         if not self.flashcards:
             return None
@@ -66,7 +66,75 @@ class LearnMode:
             weights.append(weight)
             
         # select question with weighted random choice
-        return random.choices(questions, weights=weights, k=1)[0]
+        question = random.choices(questions, weights=weights, k=1)[0]
+        answer = self.flashcards[question]
+        
+        # Generate question based on level
+        if level == 1:  # t/f
+            if random.random() > 0.5:
+                return {
+                    'question': f"True or False: {question} means {answer}",
+                    'answer': 'True',
+                    'type': 'true_false'
+                }
+            else:
+                other_answers = [value for key, value in self.flashcards.items() if key != question]
+                if other_answers:
+                    wrong_answer = random.choice(other_answers)
+                    return {
+                        'question': f"True or False: {question} means {wrong_answer}",
+                        'answer': 'False',
+                        'type': 'true_false'
+                    }
+                else:
+                    return {
+                        'question': f"True or False: {question} means {answer}",
+                        'answer': 'True',
+                        'type': 'true_false'
+                    }
+                
+        elif level == 2:  # mcq
+            options = [answer]
+            other_answers = [value for key, value in self.flashcards.items() if key != question]
+            
+            if len(other_answers) >= 3:
+                options.extend(random.sample(other_answers, 3))
+            else:
+                options.extend(other_answers)
+                
+            while len(options) < 4 and len(options) < len(self.flashcards) + 1:
+                for value in self.flashcards.values():
+                    if value not in options:
+                        options.append(value)
+                        break
+                        
+            random.shuffle(options)
+            correct_index = options.index(answer)
+            
+            question_str = f"What does '{question}' mean?\n"
+            for i, opt in enumerate(options):
+                question_str += f"{chr(65+i)}) {opt}\n"
+            
+            return {
+                'question': question_str,
+                'answer': chr(65 + correct_index),
+                'options': options,
+                'type': 'multiple_choice'
+            }
+            
+        elif level == 3:  # written response
+            return {
+                'question': f"Write the definition of: {question}",
+                'answer': answer,
+                'type': 'written'
+            }
+        
+        # default case
+        return {
+            'question': f"Definition of {question}?",
+            'answer': answer,
+            'type': 'written'
+        }
 
     def check_answer(self, question, user_answer):
         """Check the user's answer for correctness."""
