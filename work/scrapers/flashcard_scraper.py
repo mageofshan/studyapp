@@ -3,13 +3,13 @@ from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 import re
 import json
-import urllib.parse
+import time
 
 #insipirations from bguliano/quizlet-parser
 
-class get_flashcards(dict):
+class scrape_flashcards(dict):
     def __init__(self, source):
-        super(get_flashcards, self).__init__()
+        super(scrape_flashcards, self).__init__()
         
         # check if source is a URL or direct input
         if source.startswith('http://') or source.startswith('https://'):
@@ -34,8 +34,32 @@ class get_flashcards(dict):
     def _parse_quizlet(self, url):
         try:
             session = HTMLSession()
-            response = session.get(url)
-            soup = BeautifulSoup(response.content, features='html.parser')
+
+            headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://quizlet.com',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1'
+        }
+            print("Waiting for 2 seconds")
+            time.sleep(2)
+            print("Done waiting")
+
+            session.cookies.clear()
+            response = session.get(url, headers=headers)
+            print(f"Got response: {response.status_code}")
+        
+            response.html.render()
+            print("JavaScript rendered")
+            soup = BeautifulSoup(response.html.html, 'lxml')
 
             # extracting the title, author, and description
             title = soup.find('h1', {'class': re.compile('UIHeading.*one')})
@@ -48,8 +72,9 @@ class get_flashcards(dict):
             self.description = description.text if description is not None else ""
 
             # extracting the flashcards
-            results = soup.findAll('span', {'class': re.compile('TermText notranslate')})
-            
+            results = soup.findAll('span', {'class': re.compile('TermText notranslate lang-en')})
+            print(f"Found {len(results)} terms")
+
             # fallback if the primary selector doesn't work
             if not results:
                 # try alternate tags
@@ -65,6 +90,7 @@ class get_flashcards(dict):
                         if term and definition:
                             self[term] = definition
             
+            print(f"Final dictionary has {len(self)} items")
             # if no flashcards were found, add some sample ones
             if len(self) == 0:
                 self["Sample Term 1"] = "Sample Definition 1"

@@ -2,7 +2,7 @@ import random
 from difflib import SequenceMatcher
 
 class LearnMode:
-    def __init__(self, flashcards, length=10, answer_with='definition', allow_typos=False):
+    def __init__(self, flashcards, length=10, answer_with='term', allow_typos=True):
         # initialize flashcards and settings
         self.flashcards = flashcards
         self.performance = {}
