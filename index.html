@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlashLearn - Quizlet Clone</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>  
+    <!-- put this somewhere
+    <label class="switch">
+        <input type="checkbox">
+        <span class="slider"></span>
+    </label>
+     -->
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h1>FlashLearn</h1>
+        <button class="new-set-btn">Create New Set</button>
+        <button class="delete-set-btn">Delete Set</button>
+        <div class="sidebar-sets">
+            <h3>Your Sets</h3>
+            <div class="set-item active">Python Basics</div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Flashcards Home Screen -->
+        <div id="home-screen">
+            <div class="section-header">
+                <h2>Python Basics</h2>
+                <button class="learn-btn" id="start-learn-btn">Learn</button>
+            </div>
+            
+            <!-- Flashcard Carousel -->
+            <div class="flashcard-carousel-container">
+                <div class="flashcard-carousel">
+                    <div class="carousel-flashcard" id="carousel-flashcard">
+                        <div class="carousel-flashcard-front" id="carousel-flashcard-front"></div>
+                        <div class="carousel-flashcard-back" id="carousel-flashcard-back"></div>
+                    </div>
+                    <div class="carousel-controls">
+                        <button class="carousel-arrow" id="carousel-left">&#8592;</button>
+                        <button class="carousel-arrow" id="carousel-right">&#8594;</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Flashcard List with Add Row -->
+            <div class="flashcard-list">
+                <!-- Add Card Row (rendered by JS) -->
+            </div>
+        </div>
+        
+        <!-- Learn Mode Settings Modal -->
+        <div class="modal fade" id="settings-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Learn Mode Settings</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <form class="settings-form">
+                    <div class="settings-group">
+                        <label for="exam-date">Exam Date (Optional)</label>
+                        <input type="date" id="exam-date">
+                    </div>
+                    <div class="settings-group">
+                        <label for="round-length">Questions per Round</label>
+                        <select id="round-length">
+                            <option value="5">5 Questions</option>
+                            <option value="10" selected>10 Questions</option>
+                            <option value="15">15 Questions</option>
+                            <option value="20">20 Questions</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label>Question Types</label>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="multiple-choice" checked>
+                            <label for="multiple-choice">Multiple Choice</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="written" checked>
+                            <label for="written">Written</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="true-false" checked>
+                            <label for="true-false">True/False</label>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <label>Answer With</label>
+                        <div class="checkbox-group">
+                            <input type="radio" name="answer-with" id="answer-term" checked>
+                            <label for="answer-term">Term</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="radio" name="answer-with" id="answer-definition">
+                            <label for="answer-definition">Definition</label>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="shuffle-terms" checked>
+                            <label for="shuffle-terms">Shuffle Terms</label>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="allow-typos" checked>
+                            <label for="allow-typos">Allow Typos</label>
+                        </div>
+                    </div>
+                    <div class="btn-container">
+                        <button type="button" class="btn secondary-btn close-settings">Cancel</button>
+                        <button type="button" class="btn primary-btn" id="start-quiz-btn">Start</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Learn Mode Quiz UI -->
+        <div id="quiz-container" class="quiz-container">
+            <div class="progress-bar-container">
+                <div class="progress-bar"></div>
+            </div>
+            <div class="question" id="question-text">
+                question text goes here
+            </div>
+            
+            <!-- Multiple Choice -->
+            <div class="answer-container multiple-choice-container">
+                <div class="answer-option">option 1</div>
+                <div class="answer-option">option 2</div>
+                <div class="answer-option">option 3</div>
+                <div class="answer-option">option 4</div>
+            </div>
+            
+            <!-- Written Answer -->
+            <div class="answer-container written-container" style="display: none;">
+                <input type="text" class="text-input" placeholder="Type your answer">
+            </div>
+            
+            <!-- True/False -->
+            <div class="answer-container true-false-container" style="display: none;">
+                <div class="tf-option">True</div>
+                <div class="tf-option">False</div>
+            </div>
+            
+            <div class="navigation-buttons">
+                <button class="btn secondary-btn" id="exit-quiz-btn">Exit</button>
+                <button class="btn primary-btn" id="submit-answer-btn">Submit</button>
+                <button class="btn primary-btn" id="next-question-btn" style="display:none;">Next</button>
+            </div>
+        </div>
+        
+        <!-- Results Screen -->
+        <div id="results-container" class="results-container">
+            <div class="results-header">
+                <h2>Round Complete!</h2>
+            </div>
+            <div class="results-summary">
+                <p>You answered # out of # questions correctly.</p>
+                <p>Round Accuracy: #%</p>
+            </div>
+            <div class="term-results">
+                <h3>Term Mastery:</h3>
+                <div class="term-result-item">
+                    <span>term</span>
+                    <span>#% mastery</span>
+                </div>
+                <div class="term-result-item">
+                    <span>term</span>
+                    <span>#% mastery</span>
+                </div>
+                <div class="term-result-item">
+                    <span>term</span>
+                    <span>#% mastery</span>
+                </div>
+            </div>
+            <div class="btn-container">
+                <button class="btn secondary-btn" id="back-to-set-btn">Back to Set</button>
+                <button class="btn primary-btn" id="new-round-btn">New Round</button>
+            </div>
+        </div>
+    </div>
+</body>
+    <script src="app.js"></script>
+</html>
