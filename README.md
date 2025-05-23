@@ -1,2 +1,7 @@
 # studyapp
-new project using pytorch to create a spaced repetition studying function, like quizlet learn mode
+using js and html/css to create
+clean ui
+readable functionality
+learn simple js with no frameworks
+create a functional learn mode clone
+allow real-world application to study off of
